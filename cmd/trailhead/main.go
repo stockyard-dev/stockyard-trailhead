@@ -26,7 +26,7 @@ func main() {
 	}
 	defer db.Close()
 
-	srv := server.New(db)
+	srv := server.New(db, server.DefaultLimits())
 
 	fmt.Printf("\n  Trailhead — Self-hosted habit and goal tracker\n")
 	fmt.Printf("  ─────────────────────────────────\n")
