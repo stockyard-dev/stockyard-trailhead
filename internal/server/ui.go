@@ -47,7 +47,7 @@ input[type=text],input[type=color],select{background:var(--bg);border:1px solid 
 <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 </head><body>
 <div class="hdr"><h1><span>Trailhead</span></h1><button class="btn btn-p" onclick="showNewHabit()">+ Habit</button></div>
-<div class="main">
+<div class="main"><div id="upgrade-banner" style="display:none;background:#241e18;border:1px solid #8b3d1a;border-left:3px solid #c45d2c;padding:.6rem 1rem;font-size:.78rem;color:#bfb5a3;margin-bottom:.8rem"><strong style="color:#f0e6d3">Free tier</strong> — 10 items max. <a href="https://stockyard.dev/trailhead/" target="_blank" style="color:#e8753a">Upgrade to Pro →</a></div>
 <div class="progress" id="progress"></div>
 <div id="habitList"></div>
 </div>
@@ -126,4 +126,5 @@ async function saveEditHabit(id){
 async function delHabit(id){await api('/api/habits/'+id,{method:'DELETE'});load()}
 function closeModal(){document.getElementById('modal').innerHTML=''}
 load()
+fetch('/api/tier').then(r=>r.json()).then(j=>{if(j.tier==='free'){var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'}}).catch(()=>{var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'});
 </script></body></html>`
