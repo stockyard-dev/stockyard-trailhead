@@ -76,10 +76,41 @@ body{background:var(--bg);color:var(--cream);font-family:var(--mono);line-height
 .acts .btn-del{margin-right:auto;color:var(--red);border-color:#3a1a1a}
 .acts .btn-del:hover{border-color:var(--red);color:var(--red)}
 .empty{text-align:center;padding:2rem;color:var(--cm);font-style:italic;font-size:.85rem}
-@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.trial-bar{flex-direction:column;align-items:stretch}.trial-bar input.key-input{width:100%}}
+.trial-bar{display:none;background:linear-gradient(90deg,#3a2419,#2e1c14);border-bottom:2px solid var(--rust);padding:.7rem 1.5rem;font-family:var(--mono);font-size:.68rem;color:var(--cream);align-items:center;gap:1rem;flex-wrap:wrap}
+.trial-bar.show{display:flex}
+.trial-bar-msg{flex:1;min-width:240px;line-height:1.5}
+.trial-bar-msg strong{color:var(--rust);text-transform:uppercase;letter-spacing:1px;font-size:.6rem;display:block;margin-bottom:.15rem}
+.trial-bar-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.trial-bar a.btn-trial{background:var(--rust);color:#fff;padding:.4rem .8rem;text-decoration:none;font-size:.65rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;border:1px solid var(--rust);transition:all .2s}
+.trial-bar a.btn-trial:hover{background:#f08545;border-color:#f08545}
+.trial-bar-divider{color:var(--cm);font-size:.6rem}
+.trial-bar input.key-input{padding:.4rem .5rem;background:var(--bg);border:1px solid var(--bg3);color:var(--cream);font-family:var(--mono);font-size:.6rem;width:200px}
+.trial-bar input.key-input:focus{outline:none;border-color:var(--rust)}
+.trial-bar button.btn-activate{padding:.4rem .7rem;background:var(--bg2);color:var(--cream);border:1px solid var(--leather);font-family:var(--mono);font-size:.6rem;cursor:pointer;text-transform:uppercase;letter-spacing:1px}
+.trial-bar button.btn-activate:hover{background:var(--bg3)}
+.trial-bar button.btn-activate:disabled{opacity:.5;cursor:wait}
+.trial-msg{font-size:.6rem;color:var(--cm);margin-left:.5rem}
+.trial-msg.error{color:#e74c3c}
+.trial-msg.success{color:#4ade80}
+.btn-disabled-trial{opacity:.45;cursor:not-allowed!important}
 </style>
 </head>
 <body>
+
+<div class="trial-bar" id="trial-bar">
+<div class="trial-bar-msg">
+<strong>Trial Required</strong>
+You can view your existing habits, but creating, editing, or checking in is locked until you start a 14-day free trial.
+</div>
+<div class="trial-bar-actions">
+<a class="btn-trial" href="https://stockyard.dev/" target="_blank" rel="noopener">Start 14-Day Trial</a>
+<span class="trial-bar-divider">or</span>
+<input type="text" class="key-input" id="trial-key-input" placeholder="SY-..." autocomplete="off" spellcheck="false">
+<button class="btn-activate" id="trial-activate-btn" onclick="activateLicense()">Activate</button>
+<span class="trial-msg" id="trial-msg"></span>
+</div>
+</div>
 
 <div class="hdr">
 <h1 id="dash-title"><span>&#9670;</span> TRAILHEAD</h1>
@@ -184,7 +215,11 @@ function habitHTML(h){
 var done=h.checked_today;
 var cls='habit'+(h.archived?' archived':'');
 var html='<div class="'+cls+'">';
+if(window._trialRequired){
+html+='<div class="check-btn '+(done?'done':'')+'" onclick="showTrialNudge()" title="Locked: trial required">'+(done?'&#10003;':'')+'</div>';
+}else{
 html+='<div class="check-btn '+(done?'done':'')+'" onclick="toggle(\''+h.id+'\','+done+')">'+(done?'&#10003;':'')+'</div>';
+}
 html+='<div class="color-dot" style="background:'+esc(h.color||'#c45d2c')+'"></div>';
 html+='<div class="habit-info">';
 html+='<div class="habit-name">'+esc(h.name);
@@ -211,9 +246,11 @@ customRows+='</div>';
 if(customRows)html+='<div class="habit-extra">'+customRows+'</div>';
 
 html+='</div>';
+if(!window._trialRequired){
 html+='<div class="habit-actions">';
 html+='<button class="icon-btn" onclick="openEdit(\''+h.id+'\')">edit</button>';
 html+='</div>';
+}
 html+='</div>';
 return html;
 }
@@ -396,9 +433,103 @@ options:cf.options||[]
 }
 }).catch(function(){
 }).finally(function(){
+checkTrialState();
 load();
 });
 })();
+
+// ─── trial-required license gating ───
+window._trialRequired=false;
+
+async function checkTrialState(){
+try{
+var resp=await fetch('/api/tier');
+if(!resp.ok)return;
+var data=await resp.json();
+window._trialRequired=!!data.trial_required;
+if(window._trialRequired){
+document.getElementById('trial-bar').classList.add('show');
+disableWriteControls();
+// Re-render so check-btn/edit-btn handlers pick up trial state
+if(typeof render==='function')render();
+else if(typeof load==='function')load();
+}else{
+document.getElementById('trial-bar').classList.remove('show');
+}
+}catch(e){}
+}
+
+function disableWriteControls(){
+var buttons=document.querySelectorAll('.hdr .btn, .hdr .btn-p');
+buttons.forEach(function(b){
+var t=b.textContent||'';
+if(t.indexOf('New')!==-1||t.indexOf('Add')!==-1||t.indexOf('Habit')!==-1){
+b.classList.add('btn-disabled-trial');
+b.title='Locked: trial required';
+b.onclick=function(e){
+e.preventDefault();
+showTrialNudge();
+return false;
+};
+}
+});
+}
+
+function showTrialNudge(){
+var input=document.getElementById('trial-key-input');
+if(input){
+input.focus();
+input.style.borderColor='var(--rust)';
+setTimeout(function(){if(input)input.style.borderColor=''},1500);
+}
+}
+
+async function activateLicense(){
+var input=document.getElementById('trial-key-input');
+var btn=document.getElementById('trial-activate-btn');
+var msg=document.getElementById('trial-msg');
+if(!input||!btn||!msg)return;
+var key=(input.value||'').trim();
+if(!key){
+msg.className='trial-msg error';
+msg.textContent='Paste your license key first';
+input.focus();
+return;
+}
+btn.disabled=true;
+msg.className='trial-msg';
+msg.textContent='Activating...';
+try{
+var resp=await fetch('/api/license/activate',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({license_key:key})
+});
+var data=await resp.json();
+if(!resp.ok){
+msg.className='trial-msg error';
+msg.textContent=data.error||'Activation failed';
+btn.disabled=false;
+return;
+}
+msg.className='trial-msg success';
+msg.textContent='Activated. Reloading...';
+setTimeout(function(){location.reload()},800);
+}catch(e){
+msg.className='trial-msg error';
+msg.textContent='Network error: '+e.message;
+btn.disabled=false;
+}
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+var input=document.getElementById('trial-key-input');
+if(input){
+input.addEventListener('keydown',function(e){
+if(e.key==='Enter')activateLicense();
+});
+}
+});
 </script>
 </body>
 </html>`
